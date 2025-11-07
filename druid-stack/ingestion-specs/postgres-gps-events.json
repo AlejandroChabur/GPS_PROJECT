@@ -1,0 +1,86 @@
+{
+  "type": "index_parallel",
+  "spec": {
+    "ioConfig": {
+      "type": "index_parallel",
+      "inputSource": {
+        "type": "sql",
+        "database": {
+          "type": "postgresql",
+          "connectorConfig": {
+            "connectURI": "jdbc:postgresql://172.28.192.1:5432/proyecto_mis_datos",
+            "user": "postgres",
+            "password": "admin123"
+          }
+        },
+        "sqls": [
+          "SELECT e.record_id::text as record_id, e.time_stamp_event, e.created_at, e.speed, e.angle, e.satellites, e.hdop, e.pdop, e.total_odometer, e.altitude, e.location_desc, e.reference_id, e.ip, ST_X(e.geom::geometry) as longitude, ST_Y(e.geom::geometry) as latitude, v.vehicle_id, v.plate as vehicle_plate, c.company_id, c.company_name, d.device_id, d.imei as device_imei, m.manufacturer_id, m.manufacturer_name, et.event_id, et.event_name, COALESCE(et.properties::text, '') as event_properties, COALESCE(u.user_id, 0) as user_id, COALESCE(u.username, '') as user_username, COALESCE(u.email, '') as user_email, COALESCE(u.full_name, '') as user_full_name, COALESCE(u.role, '') as user_role FROM event_record e INNER JOIN vehicle v ON e.vehicle_id = v.vehicle_id INNER JOIN company c ON v.company_id = c.company_id INNER JOIN device d ON e.device_id = d.device_id INNER JOIN manufacturer m ON d.manufacturer_id = m.manufacturer_id INNER JOIN event_type et ON e.event_id = et.event_id LEFT JOIN \"user\" u ON e.user_id = u.user_id WHERE e.deleted_at IS NULL"
+        ]
+      },
+      "inputFormat": {
+        "type": "json"
+      }
+    },
+    "tuningConfig": {
+      "type": "index_parallel",
+      "partitionsSpec": {
+        "type": "dynamic"
+      },
+      "maxNumConcurrentSubTasks": 2
+    },
+    "dataSchema": {
+      "dataSource": "gps_events",
+      "timestampSpec": {
+        "column": "time_stamp_event",
+        "format": "auto"
+      },
+      "dimensionsSpec": {
+        "dimensions": [
+          "record_id",
+          {"name": "vehicle_id", "type": "long"},
+          "vehicle_plate",
+          {"name": "company_id", "type": "long"},
+          "company_name",
+          {"name": "device_id", "type": "long"},
+          "device_imei",
+          {"name": "manufacturer_id", "type": "long"},
+          "manufacturer_name",
+          {"name": "event_id", "type": "long"},
+          "event_name",
+          "event_properties",
+          {"name": "user_id", "type": "long"},
+          "user_username",
+          "user_email",
+          "user_full_name",
+          "user_role",
+          "location_desc",
+          "reference_id",
+          "ip",
+          {"name": "latitude", "type": "double"},
+          {"name": "longitude", "type": "double"},
+          {"name": "altitude", "type": "double"},
+          {"name": "speed", "type": "double"},
+          {"name": "angle", "type": "double"},
+          {"name": "satellites", "type": "long"},
+          {"name": "hdop", "type": "double"},
+          {"name": "pdop", "type": "double"},
+          {"name": "total_odometer", "type": "double"}
+        ]
+      },
+      "metricsSpec": [
+        {"name": "count", "type": "count"},
+        {"name": "total_events", "type": "count"},
+        {"name": "sum_speed", "type": "doubleSum", "fieldName": "speed"},
+        {"name": "max_speed", "type": "doubleMax", "fieldName": "speed"},
+        {"name": "min_speed", "type": "doubleMin", "fieldName": "speed"},
+        {"name": "sum_distance", "type": "doubleSum", "fieldName": "total_odometer"}
+      ],
+      "granularitySpec": {
+        "type": "uniform",
+        "segmentGranularity": "DAY",
+        "queryGranularity": "MINUTE",
+        "rollup": false
+      }
+    }
+  }
+}

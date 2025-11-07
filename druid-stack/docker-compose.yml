@@ -1,0 +1,172 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # ZOOKEEPER (Coordinación Druid)
+  # ===========================================
+  zookeeper:
+    image: zookeeper:3.8
+    container_name: druid-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOO_MY_ID: 1
+    volumes:
+      - zookeeper-data:/data
+      - zookeeper-logs:/datalog
+    networks:
+      - druid-network
+    restart: unless-stopped
+
+  # ===========================================
+  # DRUID - PostgreSQL Metadata Store
+  # ===========================================
+  postgres:
+    image: postgres:14-alpine
+    container_name: druid-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_PASSWORD: druid123
+      POSTGRES_USER: druid
+      POSTGRES_DB: druid
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - druid-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U druid"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # DRUID - Coordinator (Master Server)
+  # ===========================================
+  coordinator:
+    image: apache/druid:28.0.1
+    container_name: druid-coordinator
+    ports:
+      - "8081:8081"
+    depends_on:
+      - zookeeper
+      - postgres
+    command:
+      - coordinator
+    environment:
+      - druid_extensions_loadList=["postgresql-metadata-storage","druid-kafka-indexing-service"]
+      - druid_zk_service_host=zookeeper
+      - druid_metadata_storage_type=postgresql
+      - druid_metadata_storage_connector_connectURI=jdbc:postgresql://postgres:5432/druid
+      - druid_metadata_storage_connector_user=druid
+      - druid_metadata_storage_connector_password=druid123
+      - druid_coordinator_startDelay=PT30S
+      - druid_coordinator_period=PT30S
+    volumes:
+      - coordinator-data:/opt/data
+    networks:
+      - druid-network
+    restart: unless-stopped
+
+  # ===========================================
+  # DRUID - Broker (Query Server)
+  # ===========================================
+  broker:
+    image: apache/druid:28.0.1
+    container_name: druid-broker
+    ports:
+      - "8082:8082"
+    depends_on:
+      - zookeeper
+      - coordinator
+    command:
+      - broker
+    environment:
+      - druid_zk_service_host=zookeeper
+      - druid_broker_http_numConnections=20
+      - druid_processing_buffer_sizeBytes=256000000
+      - druid_processing_numMergeBuffers=2
+      - druid_processing_numThreads=2
+    networks:
+      - druid-network
+    restart: unless-stopped
+
+  # ===========================================
+  # DRUID - Historical (Data Server)
+  # ===========================================
+  historical:
+    image: apache/druid:28.0.1
+    container_name: druid-historical
+    ports:
+      - "8083:8083"
+    depends_on:
+      - zookeeper
+      - coordinator
+    command:
+      - historical
+    environment:
+      - druid_zk_service_host=zookeeper
+      - druid_processing_buffer_sizeBytes=256000000
+      - druid_processing_numMergeBuffers=2
+      - druid_processing_numThreads=2
+    volumes:
+      - historical-data:/opt/data/segments
+    networks:
+      - druid-network
+    restart: unless-stopped
+
+  # ===========================================
+  # DRUID - MiddleManager (Ingestion)
+  # ===========================================
+  middlemanager:
+    image: apache/druid:28.0.1
+    container_name: druid-middlemanager
+    ports:
+      - "8091:8091"
+      - "8100-8105:8100-8105"
+    depends_on:
+      - zookeeper
+      - coordinator
+    command:
+      - middleManager
+    environment:
+      - druid_zk_service_host=zookeeper
+      - druid_worker_capacity=4
+      - druid_indexer_runner_javaOptsArray=["-server","-Xmx1g","-Xms1g","-XX:MaxDirectMemorySize=1g"]
+    volumes:
+      - middlemanager-data:/opt/data
+    networks:
+      - druid-network
+    restart: unless-stopped
+
+  # ===========================================
+  # DRUID - Router (Web Console)
+  # ===========================================
+  router:
+    image: apache/druid:28.0.1
+    container_name: druid-router
+    ports:
+      - "8888:8888"
+    depends_on:
+      - broker
+      - coordinator
+    command:
+      - router
+    environment:
+      - druid_zk_service_host=zookeeper
+    networks:
+      - druid-network
+    restart: unless-stopped
+
+volumes:
+  zookeeper-data:
+  zookeeper-logs:
+  postgres-data:
+  coordinator-data:
+  historical-data:
+  middlemanager-data:
+
+networks:
+  druid-network:
+    driver: bridge
