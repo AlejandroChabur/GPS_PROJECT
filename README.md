@@ -259,43 +259,5 @@ gps-tracking-system/
 └── logs/
 ```
 
-## 🔐 Seguridad
-
-⚠️ **IMPORTANTE**: Antes de subir a GitHub:
-
-1. **NO incluir contraseñas** en los archivos
-2. Usar variables de entorno:
-   ```bash
-   export POSTGRES_PASSWORD="tu_password"
-   export CASSANDRA_PASSWORD="tu_password"
-   ```
-3. Agregar `.env` al `.gitignore`
-4. Usar archivos de configuración separados
-
-## 🤝 Contribuciones
-
-Las contribuciones son bienvenidas. Por favor:
-
-1. Fork el proyecto
-2. Crea una rama (`git checkout -b feature/mejora`)
-3. Commit tus cambios (`git commit -m 'Agregar mejora'`)
-4. Push a la rama (`git push origin feature/mejora`)
-5. Abre un Pull Request
-
-## 📝 Licencia
-
-MIT License - ver [LICENSE](LICENSE) para detalles
-
-## 👤 Autor
-
-Tu Nombre - [@tu-usuario](https://github.com/tu-usuario)
-
-## 🙏 Agradecimientos
-
-- Apache Cassandra Community
-- Apache Druid Community
-- PostgreSQL Global Development Group
-
----
 
 ⭐ Si este proyecto te fue útil, considera darle una estrella en GitHub!
