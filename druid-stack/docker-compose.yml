@@ -1,9 +1,4 @@
-version: '3.8'
-
 services:
-  # ===========================================
-  # ZOOKEEPER (Coordinación Druid)
-  # ===========================================
   zookeeper:
     image: zookeeper:3.8
     container_name: druid-zookeeper
@@ -18,9 +13,6 @@ services:
       - druid-network
     restart: unless-stopped
 
-  # ===========================================
-  # DRUID - PostgreSQL Metadata Store
-  # ===========================================
   postgres:
     image: postgres:14-alpine
     container_name: druid-postgres
@@ -35,15 +27,7 @@ services:
     networks:
       - druid-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U druid"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  # ===========================================
-  # DRUID - Coordinator (Master Server)
-  # ===========================================
   coordinator:
     image: apache/druid:28.0.1
     container_name: druid-coordinator
@@ -52,26 +36,71 @@ services:
     depends_on:
       - zookeeper
       - postgres
-    command:
-      - coordinator
+    command: coordinator
+    user: "root"
     environment:
-      - druid_extensions_loadList=["postgresql-metadata-storage","druid-kafka-indexing-service"]
+      - DRUID_XMX=1g
+      - DRUID_XMS=1g
+      - DRUID_MAXDIRECTMEMORYSIZE=512m
+      - druid_extensions_loadList=["postgresql-metadata-storage"]
       - druid_zk_service_host=zookeeper
+      - druid_zk_paths_base=/druid
       - druid_metadata_storage_type=postgresql
       - druid_metadata_storage_connector_connectURI=jdbc:postgresql://postgres:5432/druid
       - druid_metadata_storage_connector_user=druid
       - druid_metadata_storage_connector_password=druid123
-      - druid_coordinator_startDelay=PT30S
+      - druid_storage_type=local
+      - druid_storage_storageDirectory=/opt/data/segments
+      - druid_indexer_logs_type=file
+      - druid_indexer_logs_directory=/opt/data/indexing-logs
+      - druid_coordinator_startDelay=PT10S
       - druid_coordinator_period=PT30S
+      - druid_host=coordinator
+      - druid_plaintextPort=8081
+      - druid_service=druid/coordinator
     volumes:
       - coordinator-data:/opt/data
+      - shared-data:/opt/shared
     networks:
       - druid-network
     restart: unless-stopped
 
-  # ===========================================
-  # DRUID - Broker (Query Server)
-  # ===========================================
+  overlord:
+    image: apache/druid:28.0.1
+    container_name: druid-overlord
+    ports:
+      - "8090:8090"
+    depends_on:
+      - zookeeper
+      - postgres
+    command: overlord
+    user: "root"
+    environment:
+      - DRUID_XMX=512m
+      - DRUID_XMS=512m
+      - DRUID_MAXDIRECTMEMORYSIZE=256m
+      - druid_extensions_loadList=["postgresql-metadata-storage"]
+      - druid_zk_service_host=zookeeper
+      - druid_zk_paths_base=/druid
+      - druid_metadata_storage_type=postgresql
+      - druid_metadata_storage_connector_connectURI=jdbc:postgresql://postgres:5432/druid
+      - druid_metadata_storage_connector_user=druid
+      - druid_metadata_storage_connector_password=druid123
+      - druid_storage_type=local
+      - druid_storage_storageDirectory=/opt/shared/segments
+      - druid_indexer_logs_type=file
+      - druid_indexer_logs_directory=/opt/shared/indexing-logs
+      - druid_indexer_queue_startDelay=PT10S
+      - druid_host=overlord
+      - druid_plaintextPort=8090
+      - druid_service=druid/overlord
+    volumes:
+      - overlord-data:/opt/data
+      - shared-data:/opt/shared
+    networks:
+      - druid-network
+    restart: unless-stopped
+
   broker:
     image: apache/druid:28.0.1
     container_name: druid-broker
@@ -80,21 +109,31 @@ services:
     depends_on:
       - zookeeper
       - coordinator
-    command:
-      - broker
+    command: broker
+    user: "root"
     environment:
+      - DRUID_XMX=1g
+      - DRUID_XMS=1g
+      - DRUID_MAXDIRECTMEMORYSIZE=512m
+      - druid_extensions_loadList=["postgresql-metadata-storage"]
       - druid_zk_service_host=zookeeper
-      - druid_broker_http_numConnections=20
-      - druid_processing_buffer_sizeBytes=256000000
+      - druid_zk_paths_base=/druid
+      - druid_metadata_storage_type=postgresql
+      - druid_metadata_storage_connector_connectURI=jdbc:postgresql://postgres:5432/druid
+      - druid_metadata_storage_connector_user=druid
+      - druid_metadata_storage_connector_password=druid123
+      - druid_broker_http_numConnections=5
+      - druid_processing_buffer_sizeBytes=25000000
       - druid_processing_numMergeBuffers=2
       - druid_processing_numThreads=2
+      - druid_sql_enable=true
+      - druid_host=broker
+      - druid_plaintextPort=8082
+      - druid_service=druid/broker
     networks:
       - druid-network
     restart: unless-stopped
 
-  # ===========================================
-  # DRUID - Historical (Data Server)
-  # ===========================================
   historical:
     image: apache/druid:28.0.1
     container_name: druid-historical
@@ -103,46 +142,77 @@ services:
     depends_on:
       - zookeeper
       - coordinator
-    command:
-      - historical
+    command: historical
+    user: "root"
     environment:
+      - DRUID_XMX=1g
+      - DRUID_XMS=1g
+      - DRUID_MAXDIRECTMEMORYSIZE=512m
+      - druid_extensions_loadList=["postgresql-metadata-storage"]
       - druid_zk_service_host=zookeeper
-      - druid_processing_buffer_sizeBytes=256000000
-      - druid_processing_numMergeBuffers=2
+      - druid_zk_paths_base=/druid
+      - druid_metadata_storage_type=postgresql
+      - druid_metadata_storage_connector_connectURI=jdbc:postgresql://postgres:5432/druid
+      - druid_metadata_storage_connector_user=druid
+      - druid_metadata_storage_connector_password=druid123
+      - druid_storage_type=local
+      - druid_storage_storageDirectory=/opt/shared/segments
+      - druid_processing_buffer_sizeBytes=25000000
       - druid_processing_numThreads=2
+      - druid_processing_numMergeBuffers=2
+      - druid_segmentCache_locations=[{"path":"/opt/data/segments","maxSize":500000000}]
+      - druid_server_maxSize=500000000
+      - druid_host=historical
+      - druid_plaintextPort=8083
+      - druid_service=druid/historical
     volumes:
-      - historical-data:/opt/data/segments
+      - historical-data:/opt/data
+      - shared-data:/opt/shared
     networks:
       - druid-network
-    restart: unless-stopped
+    restart: "no"
 
-  # ===========================================
-  # DRUID - MiddleManager (Ingestion)
-  # ===========================================
   middlemanager:
     image: apache/druid:28.0.1
     container_name: druid-middlemanager
     ports:
       - "8091:8091"
-      - "8100-8105:8100-8105"
+      - "8100-8102:8100-8102"
     depends_on:
       - zookeeper
       - coordinator
-    command:
-      - middleManager
+    command: middleManager
+    user: "root"
     environment:
+      - DRUID_XMX=512m
+      - DRUID_XMS=512m
+      - DRUID_MAXDIRECTMEMORYSIZE=256m
+      - druid_extensions_loadList=["postgresql-metadata-storage"]
       - druid_zk_service_host=zookeeper
-      - druid_worker_capacity=4
-      - druid_indexer_runner_javaOptsArray=["-server","-Xmx1g","-Xms1g","-XX:MaxDirectMemorySize=1g"]
+      - druid_zk_paths_base=/druid
+      - druid_metadata_storage_type=postgresql
+      - druid_metadata_storage_connector_connectURI=jdbc:postgresql://postgres:5432/druid
+      - druid_metadata_storage_connector_user=druid
+      - druid_metadata_storage_connector_password=druid123
+      - druid_storage_type=local
+      - druid_storage_storageDirectory=/opt/shared/segments
+      - druid_indexer_logs_type=file
+      - druid_indexer_logs_directory=/opt/shared/indexing-logs
+      - druid_worker_capacity=2
+      - druid_indexer_runner_javaOptsArray=["-server","-Xmx512m","-Xms512m","-XX:MaxDirectMemorySize=256m","-Duser.timezone=UTC","-Dfile.encoding=UTF-8"]
+      - druid_indexer_fork_property_druid_processing_buffer_sizeBytes=25000000
+      - druid_indexer_fork_property_druid_processing_numThreads=1
+      - druid_indexer_task_baseTaskDir=/opt/data/task
+      - druid_host=middlemanager
+      - druid_plaintextPort=8091
+      - druid_service=druid/middlemanager
     volumes:
       - middlemanager-data:/opt/data
+      - shared-data:/opt/shared
     networks:
       - druid-network
-    restart: unless-stopped
+    restart: "no"
 
-  # ===========================================
-  # DRUID - Router (Web Console)
-  # ===========================================
   router:
     image: apache/druid:28.0.1
     container_name: druid-router
@@ -151,10 +221,26 @@ services:
     depends_on:
       - broker
       - coordinator
-    command:
-      - router
+    command: router
+    user: "root"
     environment:
+      - DRUID_XMX=512m
+      - DRUID_XMS=512m
+      - DRUID_MAXDIRECTMEMORYSIZE=256m
+      - druid_extensions_loadList=["postgresql-metadata-storage"]
       - druid_zk_service_host=zookeeper
+      - druid_zk_paths_base=/druid
+      - druid_metadata_storage_type=postgresql
+      - druid_metadata_storage_connector_connectURI=jdbc:postgresql://postgres:5432/druid
+      - druid_metadata_storage_connector_user=druid
+      - druid_metadata_storage_connector_password=druid123
+      - druid_router_http_numConnections=20
+      - druid_router_http_readTimeout=PT5M
+      - druid_router_http_numMaxThreads=50
+      - druid_router_managementProxy_enabled=true
+      - druid_host=router
+      - druid_plaintextPort=8888
+      - druid_service=druid/router
     networks:
       - druid-network
     restart: unless-stopped
@@ -164,8 +250,10 @@ volumes:
   zookeeper-logs:
   postgres-data:
   coordinator-data:
+  overlord-data:
   historical-data:
   middlemanager-data:
+  shared-data:
 
 networks:
   druid-network:
