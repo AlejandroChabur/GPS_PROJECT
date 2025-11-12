@@ -1,263 +1,99 @@
-# 🚗 GPS Tracking System - Multi-Database Architecture
+# 🚗 GPS Tracking System - Data Lakehouse Architecture
 
-Sistema de rastreo GPS en tiempo real con arquitectura de bases de datos distribuidas optimizado para diferentes cargas de trabajo.
+Sistema de rastreo GPS vehicular en tiempo real basado en una **arquitectura Data Lakehouse**, combinando procesamiento **batch**, **serving** y **analytics** para lograr alta disponibilidad, escalabilidad y análisis en tiempo real.
 
-## 🏗️ Arquitectura
+---
 
-```
-PostgreSQL (OLTP)
-    ↓
-    ├─→ Cassandra (Time-series & IoT data)
-    └─→ Druid (Analytics & OLAP)
-```
+## 🧠 Descripción General
 
-### Componentes
+Este proyecto implementa un **ecosistema de datos distribuido** para procesar, almacenar y analizar información GPS proveniente de dispositivos vehiculares.  
+Integra varias tecnologías open-source bajo una arquitectura **Lambda**, permitiendo tanto procesamiento en lote como análisis en streaming.
 
-- **PostgreSQL**: Base de datos transaccional principal (OLTP)
-- **Cassandra**: Almacenamiento de series temporales para datos IoT
-- **Druid**: Motor de analytics para consultas OLAP en tiempo real
-- **Scripts de sincronización**: Python scripts para ETL automático
+---
 
-## 📋 Requisitos
+## 🎯 Objetivos del Proyecto
 
-### Software
-- Python 3.12+
-- PostgreSQL 14+
-- Apache Cassandra 4.x
-- Apache Druid 28.x
-- Docker & Docker Compose (opcional)
+- Capturar y almacenar datos GPS de vehículos en tiempo real.  
+- Procesar eventos mediante pipelines **PySpark ETL**.  
+- Distribuir los datos entre diferentes capas (Batch, Serving, Analytics).  
+- Permitir consultas OLAP de baja latencia y resiliencia ante fallos.  
+- Orquestar los servicios mediante contenedores Docker.
 
-### Dependencias Python
+---
+
+## 🏗️ Arquitectura General
+    ┌──────────────┐
+     │ PostgreSQL   │  ← Batch Layer
+     └──────┬───────┘
+            │
+      PySpark ETL
+            │
+  ┌─────────┴─────────┐
+  │                   │
+┌──────────────┐ ┌──────────────┐
+│ Cassandra │ │ Druid │
+│ Serving Layer│ │ Analytics OLAP│
+└──────────────┘ └──────────────┘
+
+
+---
+
+## ⚙️ Stack Tecnológico
+
+| Componente | Versión / Tipo | Descripción |
+|-------------|----------------|--------------|
+| **PostgreSQL + PostGIS** | 14+ / 18 | Base transaccional (OLTP / Batch) |
+| **Apache Cassandra** | 4.x | Capa de Serving distribuida (IoT Time-Series) |
+| **Apache Druid** | 28.x | Capa analítica OLAP de baja latencia |
+| **PySpark** | 3.x | Procesamiento y ETL de datos |
+| **Docker Compose** | Latest | Orquestación de servicios |
+| **Python** | 3.12+ | Scripts de sincronización y automatización |
+
+---
+
+## 📊 Flujo de Datos
+
+1. **Ingesta de datos:**  
+   Los dispositivos GPS generan eventos que se almacenan inicialmente en **PostgreSQL**.  
+2. **Procesamiento (ETL):**  
+   **PySpark** extrae los datos, los transforma y los distribuye hacia **Cassandra** y **Druid**.  
+3. **Cassandra (Serving Layer):**  
+   Optimizada para consultas rápidas y resiliencia ante fallos.  
+4. **Druid (Analytics Layer):**  
+   Permite análisis OLAP y dashboards en tiempo real.
+
+---
+
+
+---
+
+## 🚀 Despliegue
+
+### 1️⃣ Clonar el repositorio
 ```bash
-pip install psycopg2-binary cassandra-driver gevent requests
-```
+git clone https://github.com/tu-usuario/ProyectoGPS.git
+cd ProyectoGPS
 
-## 🚀 Instalación
-
-### 1. Clonar el repositorio
-```bash
-git clone https://github.com/tu-usuario/gps-tracking-system.git
-cd gps-tracking-system
-```
-
-### 2. Configurar PostgreSQL
-
-```sql
--- Crear base de datos
-CREATE DATABASE proyecto_mis_datos;
-
--- Ejecutar schemas (ver /database/schemas/)
-\i database/schemas/postgresql_schema.sql
-```
-
-### 3. Configurar Cassandra
-
-```bash
-# Iniciar Cassandra
 docker-compose -f cassandra-stack/docker-compose.yml up -d
-
-# Crear keyspace y tablas
-cqlsh -f database/schemas/cassandra_schema.cql
-```
-
-### 4. Configurar Druid
-
-```bash
-# Iniciar Druid
 docker-compose -f druid-stack/docker-compose.yml up -d
 
-# Verificar servicios
-curl http://localhost:8888/status
-```
+Conclusión
 
-### 5. Configurar scripts de sincronización
+Este sistema demuestra cómo combinar tecnologías OLTP, NoSQL y OLAP bajo una arquitectura moderna de Data Lakehouse, capaz de:
 
-Editar archivos de configuración en `/scripts/`:
+Procesar y distribuir datos GPS a gran escala.
 
-**sync_postgres_to_cassandra.py**
-```python
-PG_CONFIG = {
-    'host': '127.0.0.1',
-    'port': 5432,
-    'dbname': 'proyecto_mis_datos',
-    'user': 'postgres',
-    'password': 'tu_password'
-}
+Permitir análisis en tiempo real y consultas históricas.
 
-CASSANDRA_HOSTS = ['localhost']
-CASSANDRA_KEYSPACE = 'gps_tracking'
-```
+Escalar horizontalmente mediante contenedores.
 
-**sync_postgres_to_druid.py**
-```python
-PG_CONFIG = {
-    'host': '127.0.0.1',
-    'port': 5432,
-    'database': 'proyecto_mis_datos',
-    'user': 'postgres',
-    'password': 'tu_password'
-}
+Servir como base para proyectos de IoT, Big Data y Streaming Analytics.
 
-DRUID_ROUTER_URL = 'http://localhost:8888'
-```
+Autor
 
-## 🔄 Uso
-
-### Sincronización manual
-
-```bash
-# Sincronizar a Cassandra
-python scripts/sync_postgres_to_cassandra.py
-
-# Sincronizar a Druid
-python scripts/sync_postgres_to_druid.py
-
-# Sincronizar ambos
-python scripts/sync_all.py
-```
-
-### Sincronización automática
-
-**Linux/Mac (crontab)**
-```bash
-# Cada 5 minutos
-*/5 * * * * cd /ruta/proyecto && python scripts/sync_all.py >> logs/sync.log 2>&1
-```
-
-**Windows (Task Scheduler)**
-```bash
-# Ejecutar run_sync.bat cada 5 minutos
-schtasks /create /tn "GPS Sync" /tr "C:\proyecto\scripts\run_sync.bat" /sc minute /mo 5
-```
-
-## 📊 Modelo de Datos
-
-### PostgreSQL (Normalizado)
-
-```
-event_record
-├── record_id (PK)
-├── time_stamp_event
-├── vehicle_id (FK)
-├── device_id (FK)
-├── event_id (FK)
-├── user_id (FK)
-├── geom (PostGIS)
-├── speed, altitude, angle
-└── ...
-
-vehicle → company
-device → manufacturer
-event_type
-user
-```
-
-### Cassandra (Desnormalizado)
-
-```
-event_record (partitioned by vehicle_id, time_stamp_event)
-├── Todos los campos desnormalizados
-├── Optimizado para queries por vehículo
-└── Retention: ilimitado
-```
-
-### Druid (Columnar OLAP)
-
-```
-gps_events
-├── Timestamp: time_stamp_event
-├── Dimensions: vehicle, company, event, user, location
-├── Metrics: speed, distance, satellites
-├── Granularity: MINUTE
-└── Segment: DAY
-```
-
-## 🔍 Queries de Ejemplo
-
-### Cassandra (CQL)
-```sql
--- Últimos eventos de un vehículo
-SELECT * FROM event_record 
-WHERE vehicle_id = 1 
-  AND time_stamp_event > '2025-11-06'
-LIMIT 100;
-```
-
-### Druid (SQL)
-```sql
--- Velocidad promedio por vehículo (última hora)
-SELECT 
-  vehicle_plate,
-  AVG(speed) as avg_speed,
-  MAX(speed) as max_speed,
-  COUNT(*) as event_count
-FROM gps_events
-WHERE __time > CURRENT_TIMESTAMP - INTERVAL '1' HOUR
-GROUP BY vehicle_plate
-ORDER BY avg_speed DESC;
-
--- Distancia recorrida por compañía (hoy)
-SELECT 
-  company_name,
-  SUM(total_distance) as distance_km
-FROM gps_events
-WHERE __time >= CURRENT_TIMESTAMP - INTERVAL '1' DAY
-GROUP BY company_name;
-```
-
-## 📈 Rendimiento
-
-| Base de Datos | Throughput | Latencia | Caso de Uso |
-|---------------|-----------|----------|-------------|
-| PostgreSQL | ~1K writes/s | < 10ms | Transacciones OLTP |
-| Cassandra | ~10K writes/s | < 5ms | IoT time-series |
-| Druid | ~100K queries/s | < 100ms | Analytics OLAP |
-
-### Métricas de sincronización
-
-- **Cassandra**: ~140 registros/segundo
-- **Druid**: ~30 registros/segundo (incluyendo pre-agregaciones)
-- **Checkpoint**: Sincronización incremental automática
-
-## 🛠️ Troubleshooting
-
-### Error: "FD already registered" (psycopg3 + gevent)
-**Solución**: Usar `psycopg2-binary` en lugar de `psycopg3`
-```bash
-pip uninstall psycopg
-pip install psycopg2-binary
-```
-
-### Cassandra: Connection timeout a IPs internas Docker
-**Solución**: Usar `127.0.0.1` explícitamente en lugar de `localhost`
-
-### Druid: Task FAILED
-**Solución**: Verificar logs en `http://localhost:8888/unified-console.html`
-
-## 📁 Estructura del Proyecto
-
-```
-gps-tracking-system/
-├── README.md
-├── requirements.txt
-├── .gitignore
-├── database/
-│   └── schemas/
-│       ├── postgresql_schema.sql
-│       ├── cassandra_schema.cql
-│       └── druid_spec.json
-├── scripts/
-│   ├── sync_postgres_to_cassandra.py
-│   ├── sync_postgres_to_druid.py
-│   ├── sync_all.py
-│   ├── run_sync.bat
-│   └── temp/
-├── cassandra-stack/
-│   └── docker-compose.yml
-├── druid-stack/
-│   └── docker-compose.yml
-└── logs/
-```
+Luis Alejandro Chabur Guevara
+Data Engineer - BI & Analytics
+📅 Versión: 1.0 — Noviembre 2025
 
 
-⭐ Si este proyecto te fue útil, considera darle una estrella en GitHub!
+
