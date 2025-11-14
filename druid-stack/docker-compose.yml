@@ -61,6 +61,10 @@ services:
     volumes:
       - coordinator-data:/opt/data
       - shared-data:/opt/shared
+      - ./segments/data:/opt/data/segments
+      - ./segments/shared:/opt/shared/segments
+      - ./indexing-logs/data:/opt/data/indexing-logs
+      - ./indexing-logs/shared:/opt/shared/indexing-logs
     networks:
       - druid-network
     restart: unless-stopped
@@ -97,6 +101,10 @@ services:
     volumes:
       - overlord-data:/opt/data
       - shared-data:/opt/shared
+      - ./segments/data:/opt/data/segments
+      - ./segments/shared:/opt/shared/segments
+      - ./indexing-logs/data:/opt/data/indexing-logs
+      - ./indexing-logs/shared:/opt/shared/indexing-logs
     networks:
       - druid-network
     restart: unless-stopped
@@ -168,6 +176,10 @@ services:
     volumes:
       - historical-data:/opt/data
       - shared-data:/opt/shared
+      - ./segments/data:/opt/data/segments
+      - ./segments/shared:/opt/shared/segments
+      - ./indexing-logs/data:/opt/data/indexing-logs
+      - ./indexing-logs/shared:/opt/shared/indexing-logs
     networks:
       - druid-network
     restart: "no"
@@ -209,6 +221,10 @@ services:
     volumes:
       - middlemanager-data:/opt/data
       - shared-data:/opt/shared
+      - ./segments/data:/opt/data/segments
+      - ./segments/shared:/opt/shared/segments
+      - ./indexing-logs/data:/opt/data/indexing-logs
+      - ./indexing-logs/shared:/opt/shared/indexing-logs
     networks:
       - druid-network
     restart: "no"
